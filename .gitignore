@@ -1,0 +1,4 @@
+# Per-repo profiles hold work-specific paths and rules; keep them local.
+review-loop/profiles/*
+!review-loop/profiles/README.md
+!review-loop/profiles/example.md
