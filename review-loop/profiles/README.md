@@ -19,7 +19,7 @@ A profile is Markdown with these sections. All are optional; a missing one means
 
 | Field | Meaning | Default without it |
 | --- | --- | --- |
-| `base_branch` | Ref the branch merges into, e.g. `origin/dev` | `origin/<default branch>` from `gh repo view`, else `origin/HEAD`, else ask |
+| `base_branch` | Ref the branch merges into, e.g. `origin/dev` | none: the run asks (or pass `--base`); a repo's default branch is not assumed |
 | `ticket_key_regex` | Pattern (Python `re` syntax) for ticket keys in branch names, matched case-insensitively and upper-cased, e.g. `PROJ-\d+`. With a capture group, the key is group 1 (e.g. `(?:^\|/)(\d+)-` for `123-fix-x` branches) | `[A-Z]{2,}[0-9]*-[0-9]+`, offered for confirmation; else the `--plan` H1; else the branch name |
 | `tracker` | `linear`, `github` or `none` | `none` |
 | `tracker_settings` | Map: for `linear`, `team_id`, `label`, `assignee`, `state`; for `github`, `repo`, `labels` | none |
@@ -38,7 +38,7 @@ A profile is Markdown with these sections. All are optional; a missing one means
 
 A table `| Pattern | Why | Extra agent |`. The Pattern cell holds one or more comma-separated globs in
 backticks (`**` crosses directories); any changed path matching one makes the recommended depth `deep`.
-A Pattern starting `diff text matching` holds an extended regular expression instead, matched
+A Pattern starting `diff text matching` holds a Python `re` expression instead, matched
 case-insensitively against added lines; `\|` inside it is the Markdown escape for `|`, so read it as `|`.
 `Extra agent` names a toolkit agent by short name to add when that row matches, or `none`. This table
 replaces the generic list in `SKILL.md`.
@@ -65,12 +65,29 @@ One organisation's repos usually share a tracker, ticket template and base branc
 commands, risk paths and repo facts. Put them in one file instead of copying the shared part:
 
 - `## Fields` gains `repos: [repo-a, repo-b]` and holds the shared fields.
-- Top-level `## Premise rerun` and `## Lens addenda` apply to every listed repo.
+- Top-level `## Risk paths`, `## Premise rerun` and `## Lens addenda` apply to every listed repo.
 - One `## Repo: <repo>` section per repo, containing any of `### Fields` (a `yaml` block),
   `### Risk paths`, `### Premise rerun` and `### Lens addenda` (with `#### conformance`, `#### correctness`,
   `#### security`), plus free-text notes.
 
-At each run the coordinator merges the shared sections with that repo's section: a field in the repo
-section replaces the shared one; risk paths and lens-addenda bullets are combined; a repo's premise-rerun
-text is added after the shared one. It writes the result to `RUN/profile.md` in the single-repo format,
-and reviewers read only that file, so they never see another repo's rules.
+At each run the coordinator merges the shared sections with that repo's section. A scalar field in the
+repo section (`base_branch`, `ticket_key_regex`, `tracker`, `ticket_template`, `ticket_attack_brief`,
+`test_cmd`, `lint_cmd`, `pr_create_skill`, `work_root`) replaces the shared one. `toolkit_notes` is the
+shared text followed by the repo's. `tracker_settings` and `models` merge key by key, the repo's value
+winning. `toolkit_extra` and `toolkit_skip` are the union of both lists; a repo section cannot undo a
+shared `toolkit_skip` entry (skip wins over `toolkit_extra`), so put a skip that only some repos want in
+those repos' sections. Risk-path rows and lens-addenda
+bullets are combined; a repo's premise-rerun text is added after the shared one. The result goes to
+`RUN/profile.md` in the single-repo format, and reviewers read only that file, so they never see
+another repo's rules.
+
+Keep anything true of only one repo in that repo's `## Repo:` section, not in the shared part:
+
+- Backticked repo paths in `## Lens addenda` and `toolkit_notes`, and risk-path globs, are checked
+  against the tree of the repo being reviewed. A path that exists in only one listed repo belongs under
+  that repo's section; in a shared section it warns "profile path `X` matches nothing; the profile may
+  be stale" on every run in the other repos.
+- `work_root` must differ per repo (keep `{repo}` in it). Runs live under `work_root/reviews/<KEY>/` and
+  lessons in `work_root/review-lessons.md`, so a shared `work_root` makes two repos share a lessons
+  file, and a key used in both (one ticket touching two repos, or the same branch name when there is no
+  ticket key) makes preflight resume or re-review the other repo's run.

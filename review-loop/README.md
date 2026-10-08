@@ -10,7 +10,7 @@ one fix-review round, and hands back a short summary.
 
 ```text
 /review-loop [small|normal|deep] [KEY ...] [options]   review the current branch
-/review-loop retro [KEY]                                record which findings were noise
+/review-loop retro [KEY]                                record which findings were noise (no KEY: newest pending retro)
 /review-loop help                                       print this block
 ```
 
@@ -20,8 +20,9 @@ one fix-review round, and hands back a short summary.
 | `KEY ...` | from the branch name | ticket keys; the first names the run directory |
 | `--model <m>` | built-in table | every reviewer in every round on `<m>` (`sonnet`, `opus`, `fable`, `haiku`, `inherit`) |
 | `--model <key>=<m>,...` | built-in table | only the named reviewers: `conformance`, `correctness`, `security`, `unguided`, `round2`, `toolkit` |
-| `--profile <name>` | `profiles/<repo>.md` | use another profile |
-| `--plan <path>` | resolved automatically | the plan file to review against |
+| `--base <ref>` | profile `base_branch`, else you are asked | branch the work merges into, e.g. `origin/dev` |
+| `--profile <name>` | `profiles/<repo>.md`, else the profile whose `repos:` lists the repo | use another profile |
+| `--plan <path>` | attached when a candidate plan's H1 names a key; otherwise shown as a candidate | the plan file to review against |
 | `--no-toolkit` | toolkit on when relevant | skip all `pr-review-toolkit` agents |
 | `--help` | | same as `help` |
 
@@ -45,8 +46,9 @@ The preflight question shows all of this before anything runs and lets you chang
 
 1. **Preflight.** Snapshots the working tree (committed, uncommitted and untracked files) as a git tree
    object without touching your index or branch. Stops at once if there is nothing to review. Finds the
-   ticket keys, the plan file, the ticket text, runs the changed tests, reruns the plan's premise check
-   if the profile says how, and recommends a depth. One question shows all of it.
+   ticket keys and the ticket text, attaches the plan file if its H1 names a key (otherwise shows it as a
+   candidate you can attach), runs the changed tests, reruns the plan's premise check if the profile says
+   how, and recommends a depth. One question shows all of it, starting with the repo and branch.
 2. **Round 1.** Reviewers start in parallel, each told only to read the brief, its lens and
    `context.md`. Each writes its report header first and appends findings as it goes, so you can open
    `round-1/<lens>.md` mid-run.
@@ -60,7 +62,8 @@ The preflight question shows all of this before anything runs and lets you chang
 5. **Summary.** Asks first, counted, then what changed, what was rejected and why, tickets drafted, what
    nobody checked, and models and tokens per reviewer.
 6. **Retro.** Which findings were noise? Approved lessons go to the lessons file, which reviewers read at
-   the start of the next run.
+   the start of the next run. "Skip for now" leaves the retro pending; `/review-loop retro` with no key
+   reopens the newest run whose retro is still pending.
 
 ## What it never does
 
@@ -80,7 +83,11 @@ run resumes from where its ledger says it stopped.
 Repo-specific settings (base branch, tracker, test commands, risk paths, extra lens rules, models) live
 in `profiles/<repo>.md`. See [`profiles/README.md`](profiles/README.md) for the format and
 [`profiles/example.md`](profiles/example.md) for a filled-in one. Profiles other than the example are
-gitignored. Without a profile the run uses defaults and says so.
+gitignored. Without a profile the run uses defaults and says so. Several repos of one organisation can
+share one profile: name the file as you like (not `README.md` or `example.md`, which are tracked), list
+the repos in its `repos:` field, which is how the lookup finds it, and give each a `## Repo: <name>`
+section for what differs (see
+[Sharing one profile across several repos](profiles/README.md#sharing-one-profile-across-several-repos)).
 
 Keep a profile to settings plus the few repo facts that the repo's own docs (AGENTS.md, CLAUDE.md) do not
 hold, and point at files rather than copying their content. Reviewers already load those docs, so a

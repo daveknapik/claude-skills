@@ -1,7 +1,7 @@
 ---
 name: review-loop
 description: Fresh-context adversarial review of the author's own branch, run from the session that wrote it. Starts reviewer subagents that have never seen the conversation, adjudicates every finding against the code, applies the safe fixes, asks one batched question for the rest, runs one fix-review round, and hands back a short summary plus a retro that curates a per-repo lessons file. Use when asked to "review my branch", "run the review loop", "fresh reviewers on this", "/review-loop", "review-loop retro", or "how do I use review-loop".
-argument-hint: "[small|normal|deep] [KEY] [--model m|key=m] [--profile p] [--plan path] [--no-toolkit] | retro [KEY] | help"
+argument-hint: "[small|normal|deep] [KEY] [--base ref] [--model m|key=m] [--profile p] [--plan path] [--no-toolkit] | retro [KEY] | help"
 ---
 
 # Review loop
@@ -49,7 +49,7 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 ## Arguments
 
 ```text
-/review-loop [small|normal|deep] [<KEY> ...] [--model <m> | --model <key>=<m>,...]
+/review-loop [small|normal|deep] [<KEY> ...] [--base <ref>] [--model <m> | --model <key>=<m>,...]
              [--profile <name>] [--plan <path>] [--no-toolkit]
 /review-loop retro [<KEY>]
 /review-loop help            (also: --help, "how do I use review-loop")
@@ -61,14 +61,18 @@ Nothing goes in the repository tree and nothing in a session temp directory.
   `correctness`, `security`, `unguided`, `round2`, `toolkit`.
 - `--model <m>` sets every reviewer in every round, toolkit agents included. `--model <key>=<m>,...` sets
   only the named keys. Precedence: flag > profile `models:` > built-in table.
-- `--profile <name>` uses `SKILL_DIR/profiles/<name>.md` instead of the repo-name lookup.
+- `--profile <name>` uses `SKILL_DIR/profiles/<name>.md` instead of the repo-name lookup. A shared
+  profile still contributes only the current repo's `## Repo:` section; if the repo is not in its
+  `repos:` list, ask before using it.
 - `--plan <path>` names the plan file and skips plan resolution.
 - `--no-toolkit` skips every toolkit agent for this run.
+- `--base <ref>` names the branch the work merges into (e.g. `origin/dev`), overriding the profile.
 
 **help**: print the block between `<!-- quickref:start -->` and `<!-- quickref:end -->` in
 `SKILL_DIR/README.md` verbatim, then stop. Start no agents, run no git commands.
 
-**retro**: jump to Step 5 for the newest run of `<KEY>` (or of the current branch's key).
+**retro**: jump to Step 5 for the newest run of `<KEY>`; with no key, the newest run under `WORK_ROOT/reviews/`
+whose State has `retro: pending`.
 
 Unknown flags or values: say which, show the usage block, stop.
 
@@ -123,23 +127,34 @@ Changed paths matching these globs (`**` crosses directories): `**/migrations/**
 `**/requirements*.txt`, `**/pyproject.toml`, `**/go.mod`, `**/Cargo.toml`; `**/package.json` only when
 a line inside `dependencies`, `devDependencies` or `peerDependencies` changed. Lockfiles alone do not
 count.
-Added lines matching, as whole words, case-insensitive: `secret`, `password`, `api_key`, `apikey`,
-`credential`, `private_key`, `access_token`. A profile's `## Risk paths` table replaces this list.
+Added lines matching this Python `re` expression, case-insensitive (a letter may not touch either end of
+the word, so `DB_PASSWORD` matches and `secretary` does not):
+`(?<![a-z])(secret|password|api_?key|credential|access_token|private_key)s?(?![a-z])|sk_(live|test)_|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}`.
+A profile's `## Risk paths` table replaces this list.
+
+Evaluate every `diff text matching` expression, this default one included, with
+`uv run --no-project python` (`re.search(pattern, line, re.I)` over the added lines of the patch:
+lines starting `+` but not `+++`). Never with `grep -E`: BSD grep has no lookbehind, and the user's
+interactive grep may be a different implementation, so a shell check gives different answers in
+different shells.
 
 ## Step 0. Preflight (before any reviewer starts)
 
 Hold everything in memory until step 12. Create no directory before then: an aborted preflight must leave
 nothing behind, because a leftover run directory would later look like a run to resume.
 
-1. **Repo.** `REPO_ROOT=$(git rev-parse --show-toplevel)`. Repo name = basename of
+1. **Repo.** The skill reviews the repository the session's working directory is in:
+   `REPO_ROOT=$(git rev-parse --show-toplevel)`. Repo name = basename of
    `git remote get-url origin` without `.git` (no remote: basename of `REPO_ROOT`). Profile =
    `--profile <name>`, else `SKILL_DIR/profiles/<repo>.md`, else the one `SKILL_DIR/profiles/*.md` whose
    `repos:` field lists `<repo>` (more than one → ask). Parse it per `profiles/README.md`; for a shared
    profile, merge the top sections with that repo's `## Repo: <repo>` section into one resolved
    profile. No file → no profile; every default applies and the preflight question says
    "profile: none, defaults".
-2. **Base branch.** Profile `base_branch`, else `origin/<name>` from
-   `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`, else `origin/HEAD`, else ask.
+2. **Base branch.** `--base <ref>`, else the profile's `base_branch`, else ask the user before the
+   snapshot (one AskUserQuestion; offer the local and `origin/` branches named `dev`, `main` or
+   `master` that exist, with Other for any ref). Never infer it: a repository's default branch is often
+   not where work merges (a repo can default to `main` while work merges into `dev`).
 3. **Snapshot.** If `git remote get-url origin` succeeds, `git fetch -q origin` (a failure becomes a
    warning in the preflight question, not a stop). Then `SKILL_DIR/snapshot.sh <base>` → `tree`,
    `merge_base`, `head`, counts, and the changed-file list. A non-zero exit: report its message in one
@@ -153,15 +168,21 @@ nothing behind, because a leftover run directory would later look like a run to 
      upper-cased, offered as "detected key, confirm" in the preflight question (branch names such as
      `utf-8-fix` produce false keys);
    - the H1 of the `--plan` file, if one was given.
-   No key → key = the branch name with `/` turned into `-`, and `TICKET_FILE=none`. If the branch is the
-   base branch or HEAD is detached, key = `<branch or detached>-<head short sha>` and skip step 5.
+   No key → key = the branch name with `/` turned into `-`, and `TICKET_FILE=none`; with a detached HEAD,
+   key = `detached-<head short sha>`. When the current branch is the base branch itself (common in a
+   personal repo worked on `main`), committed work counts as finished: in step 5 a prior run counts only
+   if its State `head` equals the current HEAD; otherwise start a new run with no `PRIOR_LEDGER`.
 5. **Prior runs.** List `WORK_ROOT/reviews/<KEY>/*/ledger.md`, newest first. If the newest run's State
    `step` is not `done`: **resume** (see Resume) instead of continuing preflight. If it is `done`:
    **re-review** (see Re-review); work out `mode` and the diff base now.
-6. **Plan file**, first match wins: `--plan <path>`; a plan file this session was already pointed at
-   (the user often clears context and starts the author session with a pointer to the plan); newest
-   `~/.claude/plans/*.md` whose H1 starts `# <KEY>`; newest one mentioning `<KEY>` anywhere (say so);
-   none. Show the choice in the preflight question.
+6. **Plan file.** `--plan <path>` always wins. Otherwise, candidates in order: a plan file this session
+   was already pointed at (the user often clears context and starts the author session with a pointer to
+   the plan); newest `~/.claude/plans/*.md` whose H1 starts `# <KEY>`; newest one mentioning `<KEY>`
+   anywhere. Attach the first candidate whose H1 contains one of the keys. If none qualifies,
+   `PLAN_FILE=none` and the preflight question shows "plan: none (candidate <path>, H1 '<h1>'; say
+   'attach plan' or pass `--plan` to use it)": every reviewer reads the plan, so an unrelated one costs
+   each of them its full length and misleads them. Show the attached plan's path and H1 in the preflight
+   question.
 7. **Ticket and PR.** Per the profile's `tracker` (you only; reviewers never touch the tracker):
    `linear` → load the Linear tools with ToolSearch, then `get_issue` with relations and `list_comments`
    for each key, plus title, state, description and comments of each related ticket. `github` →
@@ -192,13 +213,16 @@ nothing behind, because a leftover run directory would later look like a run to 
     `git ls-tree -r --name-only <merge_base>` (a directory
     path matches any file under it). Each miss becomes a warning: "profile path `X` matches nothing;
     the profile may be stale".
-11. **The preflight question** (AskUserQuestion). The question text carries, compactly: profile (or
+11. **The preflight question** (AskUserQuestion). Its first line is `REPO_ROOT` and the current branch
+    (`git rev-parse --abbrev-ref HEAD`; `detached` when that prints `HEAD`),
+    so a wrong repo or worktree is the first thing the user sees. Then, compactly: profile (or
     "none, defaults"); keys (detected ones marked "confirm"); plan path (or none); base, merge-base and
     snapshot shas; mode (`full`, or `delta` with the reason); changed-file count and list (first 15, then
     "+n more"); test result; premise rerun result; recommended depth with the reason; each reviewer with
     its model; toolkit agents to run, or skipped and why; warnings. Options (at most 4): run at the
     recommended depth; the other two depths, each naming the word that preselects it ("deep (or pass
-    `deep` next time)"); abort. Model changes, `--no-toolkit` and key corrections go through Other.
+    `deep` next time)"); abort. Model changes, `--no-toolkit`, key corrections and
+    "attach plan" (attach the candidate plan) go through Other.
     If the user passed a depth, still ask: the passed depth is the first option and the question text
     says "as requested". This question is the last chance to catch a wrong worktree or plan before
     reviewers start.
@@ -248,15 +272,21 @@ step: round-1-pending | round-2-pending | summary | done
 depth: small | normal | deep
 models: <as in context.md>
 merge_base: <sha>
+head: <HEAD at the run's snapshot>
 snap1: <sha>
 snap2: <sha | none>
 snap_final: <sha | none>
 prior_run: <path | none>
 mode: full | delta
+retro: none | pending | done | skipped
 
 ## Findings
 | id | severity / confidence | decision | reason | shape | clarification | applied |
 | --- | --- | --- | --- | --- | --- | --- |
+
+## Usage
+| round | reviewer | model | tokens | tool uses | duration |
+| --- | --- | --- | --- | --- | --- |
 ```
 
 `step` names the next thing to do. `round-1-pending` covers round 1 and its adjudication;
@@ -295,7 +325,9 @@ Start every reviewer in **one message** so they run in parallel: each is an Agen
   comment must match the code at REVIEW_REF. Comments state a rule plus a pointer, not history or
   dates." Others: none.
 
-Wait for every reviewer to finish. Record each agent's token usage from its completion notice, and the
+Wait for every reviewer to finish. Record each agent's token usage, tool uses and duration from its
+completion notice in a `## Usage` section at the end of `ledger.md` as soon as it arrives (a resumed run
+has nothing else to recover them from), and the
 model you passed in its Agent call (`inherit` means the session model); the notice does not name it.
 
 **Validate before reading any finding.** If a report file is missing but the agent's final message
@@ -323,7 +355,11 @@ Rules:
 - **Accept** on your own check. **Reject** only with a citation the reviewer could not dispute. A
   rejection usually means an artifact (plan, ticket text, comment) misled the reviewer: name it in
   `clarification` and fix it. When the code itself plainly contradicts the finding, write
-  "none needed: reviewer misread `file:line`".
+  "none needed: reviewer misread `file:line`". When the rejection rests on code that is not in
+  `REVIEW_REF` (another branch or worktree, uncommitted work elsewhere), start the reason with
+  "rests on <branch>, uncommitted" (or the commit, if it has one) and name the file and lines there;
+  the summary lists every such rejection so the two changes land together. Reviewers do not read that
+  code, so round 2 can only mark such a rejection plausible.
 - **Fix shape is a separate decision.** Write the actual change. If it differs from the reviewer's
   proposed diff, `shape` says why.
 - **Gate classes.** Apply immediately (autonomous) when all hold: the finding is confirmed against code,
@@ -384,7 +420,7 @@ Write `RUN/summary.md` and print it. Follow the user's reporting rules:
   usage per reviewer per round; PR-body sentences pending.
 - Head no-action items `No action — …`.
 
-Set `step: done`, then run Step 5.
+Set `step: done` and `retro: pending`, then run Step 5.
 
 ## Step 5. Retro
 
@@ -396,15 +432,18 @@ missed.
 Draft each lesson as a pattern with a date and run ("do not flag X in Y; <KEY> <date>"). Sort them:
 
 - A repo fact that will stay true → offer it first as an AGENTS.md (or the repo's equivalent) change,
-  drafted for the user to put through review; offer it as a profile lens-addenda line only if it does
-  not belong in the repo. Never edit repo files for a lesson yourself.
+  drafted for the user to put through review; offer it as a profile lens-addenda line (in the
+  `## Repo: <repo>` section when the profile is shared) only if it does not belong in the repo. Never
+  edit repo files for a lesson yourself.
 - Reviewer behaviour true in any repo → offer it as a line for the user's global CLAUDE.md, in chat.
   Never write CLAUDE.md yourself.
 - Everything else → `WORK_ROOT/review-lessons.md`.
 
 Show the drafts; write only what the user approves. Keep the lessons file at about 40 lines: when an
 addition would exceed that, propose merges or prunes in the same exchange and rewrite the file in
-place. Add the retro outcome to `summary.md`.
+place. Add the retro outcome to `summary.md` and set `retro: done`. "Skip for now" leaves it
+`pending`, so `/review-loop retro` finds the run later; set `retro: skipped` only when the user says no
+retro is wanted for this run.
 
 ## Resume
 

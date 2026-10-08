@@ -143,7 +143,9 @@ file is missing.
 `REVIEW_REF` is the tree with those changes. `LEDGER` lists each round-1 id with its decision.
 
 1. For each id the ledger marks `reject`: read the original finding in `PRIOR_ROUND_DIR`, not the ledger's
-   paraphrase, and try to show the rejection wrong against the code. If it holds, say so in one line.
+   paraphrase, and try to show the rejection wrong against the code. If it holds, say so in one line. If
+   the reason starts "rests on <branch>", the code it cites is outside `REVIEW_REF`: do not read it (the
+   Hard limits still apply); say "rests on <branch>; plausible, not checked" and move on.
 2. For each id marked `fix`, `nit-fixed` or `doc`: check that the applied change fixes the stated failure
    and introduces no new one.
 3. New findings only inside `DIFF_PATCH`, but read whatever callees that needs.
