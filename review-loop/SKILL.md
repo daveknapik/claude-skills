@@ -24,7 +24,7 @@ In zsh, `$REF:app/x.py` applies the `:a` modifier and reads the wrong path.
 | File | Who reads it |
 | --- | --- |
 | `SKILL_DIR/reviewer-brief.md` | every reviewer, first |
-| `SKILL_DIR/lens-conformance.md`, `lens-correctness.md`, `lens-security.md` | the lens reviewer of that name |
+| `SKILL_DIR/lens-conformance.md`, `lens-correctness.md`, `lens-security.md`, `lens-environment.md`, `lens-coherence.md` | the lens reviewer of that name |
 | `SKILL_DIR/snapshot.sh` | you only |
 | `SKILL_DIR/profiles/<repo>.md` | you; reviewers read only lens addenda |
 | `SKILL_DIR/profiles/README.md` | you, to parse a profile |
@@ -44,7 +44,9 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 - A reviewer report without a valid header is "not run", never "no findings".
 - Severity labels are for the user's adjudication only. Nothing written into a PR body, ticket or code
   comment carries "blocker", a correction notice, or a list of review decisions.
-- Two rounds at most per run. Nothing is held for a third.
+- Two rounds at most per run. Nothing is held for a third. Never start reviewers outside a run's two
+  rounds: changes made after a run's summary (fixes the user asks for, replies to other reviewers, new
+  work) are reviewed by invoking the skill again (see Re-review), which picks lenses for those changes.
 
 ## Arguments
 
@@ -58,7 +60,7 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 - A depth word becomes the first option of the preflight question; the question is still asked.
 - `<KEY>`: ticket keys. The first one names the run directory.
 - `<m>` is one of `sonnet`, `opus`, `fable`, `haiku`, `inherit`. `<key>` is one of `conformance`,
-  `correctness`, `security`, `unguided`, `round2`, `toolkit`.
+  `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit`.
 - `--model <m>` sets every reviewer in every round, toolkit agents included. `--model <key>=<m>,...` sets
   only the named keys. Precedence: flag > profile `models:` > built-in table.
 - `--profile <name>` uses `SKILL_DIR/profiles/<name>.md` instead of the repo-name lookup. A shared
@@ -85,6 +87,8 @@ Unknown flags or values: say which, show the usage block, stop.
 | `conformance` | opus | |
 | `correctness` | fable | |
 | `security` | opus | round 1, and round 2 when triggered |
+| `environment` | opus | when relevant (below), round 1 and round 2 |
+| `coherence` | opus | when relevant (below) |
 | `unguided` | opus | fable at depth small, where it is the only reviewer, unless a flag or profile sets `unguided` |
 | `round2` | opus | the round-2 correctness reviewer |
 | `toolkit` | inherit | `inherit` = omit the Agent `model` parameter |
@@ -100,6 +104,17 @@ model. If every reviewer resolves to `sonnet` (or `haiku`), add the warning line
 | small | ≤ 5 files, ≤ ~150 changed lines, no risk path, no new non-test module | unguided | none | correctness (`round2`) |
 | normal | anything else without a risk path | conformance, correctness, security, unguided | `silent-failure-hunter`, `comment-analyzer` when relevant | correctness |
 | deep | any risk-path match | same four | normal's two, plus `pr-test-analyzer`, `type-design-analyzer` when relevant | correctness, plus security if an applied fix touched a risk path |
+
+At **every** depth, `small` included, add these lenses when they are relevant. They exist because a small
+change to instructions can be wrong in ways no other lens looks for, and size does not predict that.
+
+| Lens | Relevant when | Round 2 |
+| --- | --- | --- |
+| `coherence` | at least half the changed lines are prose (Markdown, docstrings, comments), or a changed file is instructions for a person or an agent (a skill, runbook, prompt, playbook) | no |
+| `environment` | the changed text tells someone to run commands or makes claims about systems outside `REPO_ROOT` (other repos, CI runs, cloud resources, chat, CLIs), **and** `ENVIRONMENT_SOURCES` is not `none` | yes, when an applied fix changed a command or such a claim |
+
+When `environment` is relevant but no source is reachable, it does not run: the preflight question says
+so, with what a profile's `environment_sources` would need to name.
 
 ### Toolkit relevance
 
@@ -213,13 +228,21 @@ nothing behind, because a leftover run directory would later look like a run to 
     `git ls-tree -r --name-only <merge_base>` (a directory
     path matches any file under it). Each miss becomes a warning: "profile path `X` matches nothing;
     the profile may be stale".
+    **Environment sources**, when the `environment` lens is relevant: take the resolved profile's
+    `environment_sources`. Check each one is reachable, read-only: a repo path exists and its ref
+    resolves (`git -C <path> rev-parse --verify <ref>`); `gh auth status` succeeds; a cloud profile
+    answers a cheap identity or list call; a chat tool is available in this session. Write the reachable
+    ones, one per line with how to read them, as `ENVIRONMENT_SOURCES`. An unreachable source becomes a
+    warning in the preflight question (an expired login is an ask: "run `! <login command>`"), never a
+    silent drop.
 11. **The preflight question** (AskUserQuestion). Its first line is `REPO_ROOT` and the current branch
     (`git rev-parse --abbrev-ref HEAD`; `detached` when that prints `HEAD`),
     so a wrong repo or worktree is the first thing the user sees. Then, compactly: profile (or
     "none, defaults"); keys (detected ones marked "confirm"); plan path (or none); base, merge-base and
     snapshot shas; mode (`full`, or `delta` with the reason); changed-file count and list (first 15, then
     "+n more"); test result; premise rerun result; recommended depth with the reason; each reviewer with
-    its model; toolkit agents to run, or skipped and why; warnings. Options (at most 4): run at the
+    its model, including `environment` and `coherence` when relevant (and why); the environment sources
+    reachable; toolkit agents to run, or skipped and why; warnings. Options (at most 4): run at the
     recommended depth; the other two depths, each naming the word that preselects it ("deep (or pass
     `deep` next time)"); abort. Model changes, `--no-toolkit`, key corrections and
     "attach plan" (attach the candidate plan) go through Other.
@@ -254,13 +277,14 @@ PROFILE_FILE: <RUN>/profile.md | none
 LESSONS_FILE: <WORK_ROOT>/review-lessons.md | none
 TESTS: <one line: command, pass/fail counts, failing names, "no tests touched", or "not run: <reason>">
 PREMISE_CHECK: <result, "not rerun: <reason>", or none>
+ENVIRONMENT_SOURCES: <one source per line, indented, with how to read it> | none
 ROUND: 1
 PRIOR_ROUND_DIR: none
 LEDGER: none
 PRIOR_LEDGER: <path> | none
 KEYS: <all keys>
 MODE: full | delta
-MODELS: conformance=<m> correctness=<m> security=<m> unguided=<m> round2=<m> toolkit=<m>
+MODELS: conformance=<m> correctness=<m> security=<m> environment=<m> coherence=<m> unguided=<m> round2=<m> toolkit=<m>
 ```
 
 ### `ledger.md`
@@ -299,7 +323,7 @@ Start every reviewer in **one message** so they run in parallel: each is an Agen
 `subagent_type: general-purpose` (toolkit agents: `pr-review-toolkit:<short name>`) and the resolved
 `model`. The prompt is exactly the following, with nothing about the author's reasoning added:
 
-- Lens reviewer `<x>` ∈ conformance, correctness, security: "Read `<SKILL_DIR>/reviewer-brief.md`,
+- Lens reviewer `<x>` ∈ conformance, correctness, security, environment, coherence: "Read `<SKILL_DIR>/reviewer-brief.md`,
   then `<SKILL_DIR>/lens-<x>.md`, then `<RUN>/context.md`. Your output file is
   `<RUN>/round-1/<x>.md`; writing it is required, the coordinator parses it."
 - Unguided reviewer: "Read `<SKILL_DIR>/reviewer-brief.md`, then `<RUN>/context.md`. No lens: you are
@@ -362,6 +386,17 @@ Rules:
   code, so round 2 can only mark such a rejection plausible.
 - **Fix shape is a separate decision.** Write the actual change. If it differs from the reviewer's
   proposed diff, `shape` says why.
+- **Duplicates: one row, every part of every fix.** When two or more reviewers report the same problem,
+  adjudicate them in one row listing every id, and apply the union of their proposed fixes: each part
+  either reviewer proposed goes in unless the row cites why that part is wrong. Taking one reviewer's
+  patch and dropping the rest loses whatever only the other one saw.
+- **Siblings.** After writing each fix, search the changed files for the same command, flag, name,
+  pattern or phrase it corrected, and fix every other occurrence in the same row. A wrong flag on one
+  call is usually wrong on the call next to it.
+- **Not checked.** Read every reviewer's `Not checked` list before the batched question. For each item
+  that rests on a fact you can check and the reviewers could not (other repos, CI runs, cloud reads,
+  chat, a CLI's `--help`), check it now, read-only, and record the result as a ledger row with id
+  `NC-<lens>-<nn>`, adjudicated like a finding. Items you cannot check go in the summary.
 - **Gate classes.** Apply immediately (autonomous) when all hold: the finding is confirmed against code,
   the change stays inside files the branch already changes or the ticket names, no risk path is
   touched, and the shape is as proposed. Everything else waits for the batched question:
@@ -400,7 +435,9 @@ Rules:
 3. Start one fresh correctness reviewer (`round2` model): "Read `<SKILL_DIR>/reviewer-brief.md`, then
    `<SKILL_DIR>/lens-correctness.md`, then `<RUN>/round-2/context.md`. This is round 2. Your output file
    is `<RUN>/round-2/correctness.md`; writing it is required, the coordinator parses it." Add a security
-   reviewer of the same shape when an applied fix touched a risk path.
+   reviewer of the same shape when an applied fix touched a risk path, and an environment reviewer of
+   the same shape when an applied fix changed a command or a claim about an outside system and
+   `ENVIRONMENT_SOURCES` is not `none`.
 4. Validate as in round 1; adjudicate as in Step 2 with `R2-` ids. Anything still open after this
    adjudication goes to the summary as the user's. **There is no round 3.**
 5. If round-2 adjudication changed any file, run `snapshot.sh <base>` again and use that tree as
@@ -419,6 +456,9 @@ Write `RUN/summary.md` and print it. Follow the user's reporting rules:
   everything reviewers listed under `Not checked` that matters; tests before and after; models and token
   usage per reviewer per round; PR-body sentences pending.
 - Head no-action items `No action — …`.
+- If round-2 adjudication changed any file, those changes have had no review: make the first ask "Run
+  `/review-loop` again to review the <n> changes made after round 2", not a request to accept them
+  unreviewed.
 
 Set `step: done` and `retro: pending`, then run Step 5.
 

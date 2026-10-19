@@ -19,7 +19,7 @@ one fix-review round, and hands back a short summary.
 | `small` / `normal` / `deep` | recommended in the preflight question | review depth (table below) |
 | `KEY ...` | from the branch name | ticket keys; the first names the run directory |
 | `--model <m>` | built-in table | every reviewer in every round on `<m>` (`sonnet`, `opus`, `fable`, `haiku`, `inherit`) |
-| `--model <key>=<m>,...` | built-in table | only the named reviewers: `conformance`, `correctness`, `security`, `unguided`, `round2`, `toolkit` |
+| `--model <key>=<m>,...` | built-in table | only the named reviewers: `conformance`, `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit` |
 | `--base <ref>` | profile `base_branch`, else you are asked | branch the work merges into, e.g. `origin/dev` |
 | `--profile <name>` | `profiles/<repo>.md`, else the profile whose `repos:` lists the repo | use another profile |
 | `--plan <path>` | attached when a candidate plan's H1 names a key; otherwise shown as a candidate | the plan file to review against |
@@ -31,6 +31,12 @@ one fix-review round, and hands back a short summary.
 | small | ≤ 5 files, ≤ ~150 lines, no risk path, no new non-test module | unguided (fable) | none | correctness (opus) |
 | normal | no risk path | conformance (opus), correctness (fable), security (opus), unguided (opus) | silent-failure-hunter, comment-analyzer when relevant | correctness (opus) |
 | deep | any risk path | same four | normal's two, plus pr-test-analyzer, type-design-analyzer when relevant | correctness (opus), plus security (opus) if a fix touched a risk path |
+
+At every depth, `small` included, two more lenses join when relevant, both on opus:
+**coherence** when the change is mostly prose or is instructions (a skill, runbook or prompt), and
+**environment** when the change runs commands or makes claims about systems outside the repo and the
+profile names `environment_sources` it can read. Environment also joins round 2 when a fix changed such a
+command or claim.
 
 Model precedence: `--model` flag > profile `models:` > this table.
 
@@ -52,13 +58,18 @@ The preflight question shows all of this before anything runs and lets you chang
 2. **Round 1.** Reviewers start in parallel, each told only to read the brief, its lens and
    `context.md`. Each writes its report header first and appends findings as it goes, so you can open
    `round-1/<lens>.md` mid-run.
-3. **Adjudication.** Every finding is checked against the code and gets one ledger row. Confirmed fixes
+3. **Adjudication.** Every finding is checked against the code and gets one ledger row. When reviewers
+   report the same problem, every part of each one's fix is applied, and each fix is repeated wherever
+   the same mistake appears elsewhere in the change. Items reviewers list as not checked, and that the
+   session can check (other repos, CI runs, cloud reads), are checked then. Confirmed fixes
    inside the ticket's files and off risk paths are applied straight away. Everything else (rejected
    blocking findings, premise challenges, risk-path fixes, fixes shaped differently from the reviewer's
    proposal, PR-body text) comes to you as **one** batched question.
 4. **Round 2.** One fresh correctness reviewer reads only the fix diff, attacks every rejection, and
-   checks each fix's shape. Security joins when a fix touched a risk path. There is no round 3; anything
-   still open is yours.
+   checks each fix's shape. Security joins when a fix touched a risk path, environment when a fix changed
+   a command or a claim about an outside system. There is no round 3; anything still open is yours, and
+   changes made after the summary are reviewed by running `/review-loop` again, not by extra reviewers
+   bolted onto the finished run.
 5. **Summary.** Asks first, counted, then what changed, what was rejected and why, tickets drafted, what
    nobody checked, and models and tokens per reviewer.
 6. **Retro.** Which findings were noise? Approved lessons go to the lessons file, which reviewers read at

@@ -29,10 +29,11 @@ A profile is Markdown with these sections. All are optional; a missing one means
 | `lint_cmd` | Lint command, same placeholders | none |
 | `pr_create_skill` | Skill that creates PRs in this repo, named when the summary hands over PR text | none |
 | `work_root` | Where run files and the lessons file go; `{repo}` expands | `~/.claude/scratchpad/{repo}` |
-| `models` | Map of `conformance`, `correctness`, `security`, `unguided`, `round2`, `toolkit` to `sonnet`/`opus`/`fable`/`haiku`/`inherit`. Set only keys you want to change: setting `unguided` also cancels the built-in "fable at depth small" rule | the built-in table in `SKILL.md` |
+| `models` | Map of `conformance`, `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit` to `sonnet`/`opus`/`fable`/`haiku`/`inherit`. Set only keys you want to change: setting `unguided` also cancels the built-in "fable at depth small" rule | the built-in table in `SKILL.md` |
 | `toolkit_extra` | List of extra `pr-review-toolkit` agents to run, by short name, e.g. `[code-reviewer]` | none |
 | `toolkit_skip` | List of toolkit agents never to run here, by short name. Wins over `toolkit_extra` and risk rows | none |
 | `toolkit_notes` | Text pasted into every toolkit agent's prompt: the repo's logging and error-handling rules | none |
+| `environment_sources` | List of outside sources the environment lens may read, read-only, each a map with `kind` (`repo`, `gh`, `cloud`, `chat`, `cli`) and how to reach it: for `repo`, `path` and `ref` (the deployed ref when the change acts on what is deployed); for `gh`, `repos`; for `cloud`, the read-only `profile` and `region`; for `chat`, the tool names; for `cli`, the commands whose `--help` may be read. The coordinator checks each is reachable before the run | none: the environment lens does not run, and the preflight question says what it would need |
 
 ### `## Risk paths`
 
@@ -51,7 +52,7 @@ profile".
 
 ### `## Lens addenda`
 
-Subsections `### conformance`, `### correctness`, `### security`, each a bullet list of repo facts the
+Subsections `### conformance`, `### correctness`, `### security`, `### environment`, `### coherence`, each a bullet list of repo facts the
 lens should check. List only facts the repo's own docs (AGENTS.md, CLAUDE.md) do not hold, since
 reviewers load those already; a restated rule only adds something to drift. Every backticked repo path
 here and in `toolkit_notes`, and every risk-path glob, is checked at each run, and one that matches
@@ -74,7 +75,7 @@ At each run the coordinator merges the shared sections with that repo's section.
 repo section (`base_branch`, `ticket_key_regex`, `tracker`, `ticket_template`, `ticket_attack_brief`,
 `test_cmd`, `lint_cmd`, `pr_create_skill`, `work_root`) replaces the shared one. `toolkit_notes` is the
 shared text followed by the repo's. `tracker_settings` and `models` merge key by key, the repo's value
-winning. `toolkit_extra` and `toolkit_skip` are the union of both lists; a repo section cannot undo a
+winning. `toolkit_extra`, `toolkit_skip` and `environment_sources` are the union of both lists; a repo section cannot undo a
 shared `toolkit_skip` entry (skip wins over `toolkit_extra`), so put a skip that only some repos want in
 those repos' sections. Risk-path rows and lens-addenda
 bullets are combined; a repo's premise-rerun text is added after the shared one. The result goes to

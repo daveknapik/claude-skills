@@ -26,6 +26,7 @@ per line; `none` means absent. Nothing else is assumed.
 | `LESSONS_FILE` | Curated lessons from earlier reviews in this repo, or `none`. |
 | `TESTS` | Result of a test run done for you, or `not run: <reason>`. If not run, judge the tests by reading them. |
 | `PREMISE_CHECK` | Result of rerunning the plan's premise check, `not rerun: <reason>`, or `none`. |
+| `ENVIRONMENT_SOURCES` | Outside sources the environment lens may read (repos at a ref, read-only `gh`, a read-only cloud profile, read-only chat tools), one per line, or `none`. Only the environment lens uses this. |
 | `ROUND` | `1` or `2`. Round 2 rules are at the end. |
 | `PRIOR_ROUND_DIR` | Round-1 reports (round 2 only), or `none`. |
 | `LEDGER` | The adjudication of round-1 findings (round 2 only), or `none`. |
@@ -47,6 +48,8 @@ per line; `none` means absent. Nothing else is assumed.
   `"${REF}:app/x.py"`.
 - Do not run tests, linters or any script in the repository.
 - No cloud APIs, no MCP tools, no chat or ticket tools, no network. No `git` command that changes state.
+  The one exception is the environment lens, which may read the sources in `ENVIRONMENT_SOURCES`, read-only,
+  as its lens file sets out. Every other reviewer stays on `REVIEW_REF`.
 - If you cannot read something you need, list it under `Could not read`, and do not guess its contents.
 
 ## Reading order
@@ -55,13 +58,14 @@ per line; `none` means absent. Nothing else is assumed.
    **No lens named** means you are the unguided reviewer: review the change and find what is wrong.
    Your id prefix is `GEN` and your lens name is `unguided`.
 2. `PROFILE_FILE`, if present: under `## Lens addenda`, your lens's subsection (`### conformance`,
-   `### correctness` or `### security`). The unguided reviewer reads all three subsections. Toolkit
+   `### correctness`, `### security`, `### environment` or `### coherence`). The unguided reviewer reads
+   all of them. Toolkit
    agents read none unless their prompt says so.
 3. `LESSONS_FILE`, if present. Apply its suppressions and pointers.
 4. Your lens's own reading list, then `DIFF_PATCH`.
 
 Budget: beyond the changed files, read at most 8 callees or callers end to end. List the rest under
-`Not checked`. Say what you did not check rather than reading whole modules "for context".
+`Not checked`. The environment lens has its own rule: it checks every row of its inventory. Say what you did not check rather than reading whole modules "for context".
 
 ## Scope
 
@@ -97,7 +101,7 @@ while you work. Update the header's `Findings:` and `Not checked:` lines at the 
 Mandatory header, the first lines of `OUT_FILE`, one field per line:
 
 ```text
-# <lens name: conformance | correctness | security | unguided | the toolkit agent's short name> — round <ROUND>
+# <lens name: conformance | correctness | security | environment | coherence | unguided | the toolkit agent's short name> — round <ROUND>
 Reviewed: <REVIEW_REF copied in full from context.md, all 40 hex characters>
 Base: <BASE_REF in full>
 Diff: <DIFF_PATCH> (<n> files, +<a>/-<b>)
@@ -109,8 +113,9 @@ Findings: <blocking n> / <should-fix n> / <nit n>
 
 A report without this header, or with a shortened sha, counts as "not run", not as "no findings".
 
-Finding ids are `R<round>-<PREFIX>-<nn>`: `CONF` conformance, `CORR` correctness, `SEC` security, `GEN`
-unguided. Toolkit agents use the prefix their prompt gives (`SFH`, `CMT`, `TEST`, `TYPE`, `CR`). Format:
+Finding ids are `R<round>-<PREFIX>-<nn>`: `CONF` conformance, `CORR` correctness, `SEC` security, `ENV`
+environment, `COH` coherence, `GEN` unguided. Toolkit agents use the prefix their prompt gives (`SFH`,
+`CMT`, `TEST`, `TYPE`, `CR`). Format:
 
 ```text
 ### R1-CORR-03  <one-line claim>
