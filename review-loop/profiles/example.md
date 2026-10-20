@@ -30,7 +30,7 @@ toolkit_notes: |
 | `src/*/auth/**` | authentication | none |
 | `pyproject.toml`, `uv.lock` | dependencies | none |
 | `src/*/models.py` | data model | `type-design-analyzer` |
-| diff text matching `(?<![a-z])(secret\|password\|api_?key\|private_key)s?(?![a-z])` | credentials | none |
+| diff text matching `(?<![a-z])(secret\|password\|passwd\|api_?key\|credential\|access_token\|private_key\|client_secret)s?(?![a-z])\s*[\"']?\s*[:=]\s*[\"']?[^\s\"',;)]\|sk_(live\|test)_\|BEGIN (RSA \|EC \|OPENSSH )?PRIVATE KEY\|AKIA[0-9A-Z]{16}` | credentials | none |
 
 ## Lens addenda
 

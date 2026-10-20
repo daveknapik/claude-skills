@@ -142,9 +142,10 @@ Changed paths matching these globs (`**` crosses directories): `**/migrations/**
 `**/requirements*.txt`, `**/pyproject.toml`, `**/go.mod`, `**/Cargo.toml`; `**/package.json` only when
 a line inside `dependencies`, `devDependencies` or `peerDependencies` changed. Lockfiles alone do not
 count.
-Added lines matching this Python `re` expression, case-insensitive (a letter may not touch either end of
-the word, so `DB_PASSWORD` matches and `secretary` does not):
-`(?<![a-z])(secret|password|api_?key|credential|access_token|private_key)s?(?![a-z])|sk_(live|test)_|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}`.
+Added lines matching this Python `re` expression, case-insensitive. A credential word counts only as an
+assignment (followed by `:` or `=` and a value), so `DB_PASSWORD=x` matches and prose such as "keep
+secrets out of the report" does not; the key shapes count anywhere:
+`(?<![a-z])(secret|password|passwd|api_?key|credential|access_token|private_key|client_secret)s?(?![a-z])\s*[\"']?\s*[:=]\s*[\"']?[^\s\"',;)]|sk_(live|test)_|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}`.
 A profile's `## Risk paths` table replaces this list.
 
 Evaluate every `diff text matching` expression, this default one included, with
