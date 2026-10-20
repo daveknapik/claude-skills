@@ -528,7 +528,10 @@ of an earlier run. One reviewer reads only the fixes and checks each one as new 
    for the branch, write every review comment, review body and reply created since the diff base's
    commit time to `comments.md` (`gh api` `pulls/<n>/comments` and `pulls/<n>/reviews`, `--paginate`).
    Otherwise `none`. A run reviewing the findings of an earlier run points at that run's ledger instead.
-3. **Environment sources** as in Step 0.10, always (the fix reviewer runs commands).
+3. **Environment sources** as in Step 0.10, always (the fix reviewer runs commands). Always add one
+   local source, even with no profile: `cli: --help of each command-line tool the diff names, and
+   local-only commands (git, jq, shell builtins) run in a throwaway directory under <RUN>/scratch, never
+   in REPO_ROOT`. Cloud, GitHub and chat reads still come only from the profile.
 4. **No question unless something is wrong.** Print the preflight block (repo and branch first, diff
    base and why, changed files, comments source, sources reachable) and start. Ask only for a warning
    (unreachable source, unknown diff base, merge-base moved).
