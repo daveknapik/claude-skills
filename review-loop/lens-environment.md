@@ -84,12 +84,28 @@ into the header's `Not checked:` line.
    or flag that turns it off, an early return, a filter, a rate limit, a retention window, a channel it
    is not sent to. If the text treats the signal's absence as evidence ("no earlier email, so it is
    new"), every such condition is a way that conclusion is wrong.
-5. **Claims about another codebase.** Where the change says how another repo behaves ("the alarm name is
+5. **Silent caps** (each `command` row that lists or searches). Find the most the source returns for
+   that call (an API's result cap, a page size, a retention window, a search limit) and what it drops
+   when it hits it: the oldest, the newest, or an arbitrary set. Run it on the widest window the text
+   implies. A result exactly at the cap is a finding unless the text says to narrow and repeat.
+6. **Other producers** (each `signal` row the text counts or matches). Who else writes the same signal
+   into the same place: another service, another process, another environment, a test or a backfill?
+   The target repo's docs are leads, not proof (they drift): confirm each producer in the data, by the
+   field that tells producers apart, and say whether the text tells the reader to filter on it.
+7. **Eras** (each `claim` or `command` row applied to past records). Read the history of the code or
+   configuration that produced those records across the window the text covers (`git log` of the
+   workflow, script or config file), list its eras with dates, and test the rule on one record from each
+   era. Test any command a fix introduces on a **current** record too: the newest era is the one readers
+   hit first.
+8. **Filter values** (each `command` or `claim` row that filters or compares against a value). List every
+   value the field actually takes in the source, with counts, before judging the filter. Different
+   spellings and suffixes of the same idea count as separate values.
+9. **Claims about another codebase.** Where the change says how another repo behaves ("the alarm name is
    a fixed string", "this setting is always on", "every frame maps to the repo"), read that code at the
    ref that is deployed, not only at its default branch.
-6. **The same fact elsewhere.** When one command or rule turns out wrong, look for the same command,
+10. **The same fact elsewhere.** When one command or rule turns out wrong, look for the same command,
    flag or assumption at every other place in the change.
-7. **Cost and access of following the text.** How many calls, prompts or pages does each step take on
+11. **Cost and access of following the text.** How many calls, prompts or pages does each step take on
    real data? Does every tool, connector and permission it needs appear in the prerequisites?
 
 ## Signals
@@ -103,3 +119,7 @@ into the header's `Not checked:` line.
 | Unbounded or unprompted cost | A step that pages without limit, or triggers prompts or tools the prerequisites never mention. |
 | Unlisted dependency | A tool, connector, permission or input the text needs and never names. |
 | Absence read as evidence | The text concludes from a missing signal that its producer can suppress. |
+| Silent truncation | A list or search that stops at a cap and drops the records the text needs. |
+| Mixed producers | A count or match that includes another producer's lines, with no field to filter them out. |
+| Rule from one era | A rule that holds for current records and not for older ones, or the reverse. |
+| Unlisted filter value | A filter that misses a spelling or variant the field actually takes. |

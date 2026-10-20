@@ -132,7 +132,8 @@ Not checked: <what this finding rests on that you did not verify>
 - Say `blocking` when you mean it: the person adjudicating wants to know. Severity is a recommendation to
   that person, never a verdict copied into a PR comment, ticket or code comment others read.
 - Write the fix as code, not advice. Writing it forces you to name the field, the timestamp and the
-  units, which is usually where a flawed finding shows itself.
+  units, which is usually where a flawed finding shows itself. If the fix adds or changes a command you
+  were not allowed to run, say so in the finding's `Not checked` line, so the coordinator runs it.
 - Every finding in this one pass; nothing held back for later.
 - Group findings by the decision each one forces, not by line number. One problem is one finding, even
   if it spans several lines.

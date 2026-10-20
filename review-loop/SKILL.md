@@ -391,6 +391,11 @@ Rules:
   adjudicate them in one row listing every id, and apply the union of their proposed fixes: each part
   either reviewer proposed goes in unless the row cites why that part is wrong. Taking one reviewer's
   patch and dropping the rest loses whatever only the other one saw.
+- **Run every command a fix introduces.** Before applying a fix, or suggesting one to anyone, run each
+  command it adds or changes, exactly as written, against the real source: on a current record and on
+  a record from each older era the text applies to. A command checked only on the record at hand is
+  not checked; fixes are where new mistakes enter. If you cannot run it, the fix is `pending-gate`
+  with the reason.
 - **Siblings.** After writing each fix, search the changed files for the same command, flag, name,
   pattern or phrase it corrected, and fix every other occurrence in the same row. A wrong flag on one
   call is usually wrong on the call next to it.
