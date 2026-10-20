@@ -229,8 +229,9 @@ nothing behind, because a leftover run directory would later look like a run to 
     path matches any file under it). Each miss becomes a warning: "profile path `X` matches nothing;
     the profile may be stale".
     **Environment sources**, when the `environment` lens is relevant: take the resolved profile's
-    `environment_sources`. Check each one is reachable, read-only: a repo path exists and its ref
-    resolves (`git -C <path> rev-parse --verify <ref>`); `gh auth status` succeeds; a cloud profile
+    `environment_sources`. Check each one is reachable: for a repo, `git -C <path> fetch -q origin` (you
+    fetch, so the reviewer never has to), then confirm its ref resolves (`git -C <path> rev-parse --verify
+    <ref>`) and record the sha it resolves to; `gh auth status` succeeds; a cloud profile
     answers a cheap identity or list call; a chat tool is available in this session. Write the reachable
     ones, one per line with how to read them, as `ENVIRONMENT_SOURCES`. An unreachable source becomes a
     warning in the preflight question (an expired login is an ask: "run `! <login command>`"), never a

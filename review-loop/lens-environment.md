@@ -33,6 +33,11 @@ One row each, changed lines first:
 | 3 | signal | guide.md:217 | yes | other-repo app/notify.py at 1a2b3c4d | not checked: <why> |
 ```
 
+For every `claim` row that selects, sorts, dates, names or matches, also add a section
+`### Population: <row #>` with the variants that exist (question 3), one per line: the variant, how you
+found it (the command and its count), the example you tested, and what the rule returned for it. A rule
+tested only on the common variant has not been tested.
+
 Then check every row. `result` is `holds` (with what showed it), a finding id, or `not checked: <why>`.
 A row left without a result is a review not done. The budget in the brief does not cap this lens: check
 every row, cheapest source first, and stop paging once a row is settled. Copy every `not checked` row
@@ -44,7 +49,11 @@ into the header's `Not checked:` line.
   on a listed repo; `gh api` GET requests and `gh run view` / `gh run list`; `--help` and man pages; the
   read-only cloud profile named in `ENVIRONMENT_SOURCES`, with `describe`, `list` and `get` calls and
   log queries; read-only chat or ticket tools when listed. Never a write, a re-run, a deploy, a
-  dispatch, a restart, or anything that sends a message.
+  dispatch, a restart, or anything that sends a message. No `git fetch` or `git pull` either: the
+  coordinator fetched every listed repo before the run, and a ref still missing goes under
+  `Could not read`.
+- **Nothing left running.** No background jobs. Every command finishes, or is stopped, before you write
+  your last finding.
 - **Only the listed sources.** A source not in `ENVIRONMENT_SOURCES` is out of bounds: list it under
   `Could not read` with what it would have settled.
 - **Bounded.** Every log or history query has a time window; every list call has a limit or a page cap.
