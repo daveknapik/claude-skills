@@ -22,7 +22,10 @@ of these kinds:
 - **command**: every command, query or API call the text tells someone to run;
 - **claim**: every statement about how an outside system behaves (what a tool returns, how names are
   built, which states exist, what a setting does, what a field contains);
-- **signal**: every email, log line, alarm, record or file the text relies on existing.
+- **signal**: every email, log line, alarm, record or file the text relies on existing;
+- **procedure**: every instruction in prose that picks or reads something from an output ("search the
+  log for X", "take the newest", "use the first match", "keep the ones that start with Y"). A procedure
+  is not a claim: check it by doing it, not by confirming that X exists.
 
 One row each, changed lines first:
 
@@ -79,33 +82,41 @@ into the header's `Not checked:` line.
    facility or environment), every state or conclusion value the records carry (`skipped`, `cancelled`,
    `neutral` as well as success and failure), every environment. Then apply the rule to one example of
    each variant and say what it returns. Also the oldest, newest, empty and very large cases.
-4. **Producer conditions** (each `signal` row). Read the code or configuration that produces the
+4. **Follow each procedure literally** (each `procedure` row). Do exactly what the text says on a current
+   real output, the way a reader with no other knowledge would: take the first match if it says
+   "search", the default output if it gives no filter, the top row if it says "the newest". Report what
+   that reader ends up with. A correct value further down the output does not make the procedure right.
+   Also check where values come from: for every claim that a value **is** something ("the run's sha is
+   what it deployed", "this time is when it happened"), find where that value is produced (the workflow
+   step, the code that writes it) and compare it on one real record against an independent source of
+   the same fact.
+5. **Producer conditions** (each `signal` row). Read the code or configuration that produces the
    signal, at the deployed ref, and list every condition under which it is **not** produced: a setting
    or flag that turns it off, an early return, a filter, a rate limit, a retention window, a channel it
    is not sent to. If the text treats the signal's absence as evidence ("no earlier email, so it is
    new"), every such condition is a way that conclusion is wrong.
-5. **Silent caps** (each `command` row that lists or searches). Find the most the source returns for
+6. **Silent caps** (each `command` row that lists or searches). Find the most the source returns for
    that call (an API's result cap, a page size, a retention window, a search limit) and what it drops
    when it hits it: the oldest, the newest, or an arbitrary set. Run it on the widest window the text
    implies. A result exactly at the cap is a finding unless the text says to narrow and repeat.
-6. **Other producers** (each `signal` row the text counts or matches). Who else writes the same signal
+7. **Other producers** (each `signal` row the text counts or matches). Who else writes the same signal
    into the same place: another service, another process, another environment, a test or a backfill?
    The target repo's docs are leads, not proof (they drift): confirm each producer in the data, by the
    field that tells producers apart, and say whether the text tells the reader to filter on it.
-7. **Eras** (each `claim` or `command` row applied to past records). Read the history of the code or
+8. **Eras** (each `claim` or `command` row applied to past records). Read the history of the code or
    configuration that produced those records across the window the text covers (`git log` of the
    workflow, script or config file), list its eras with dates, and test the rule on one record from each
    era. Test any command a fix introduces on a **current** record too: the newest era is the one readers
    hit first.
-8. **Filter values** (each `command` or `claim` row that filters or compares against a value). List every
+9. **Filter values** (each `command` or `claim` row that filters or compares against a value). List every
    value the field actually takes in the source, with counts, before judging the filter. Different
    spellings and suffixes of the same idea count as separate values.
-9. **Claims about another codebase.** Where the change says how another repo behaves ("the alarm name is
+10. **Claims about another codebase.** Where the change says how another repo behaves ("the alarm name is
    a fixed string", "this setting is always on", "every frame maps to the repo"), read that code at the
    ref that is deployed, not only at its default branch.
-10. **The same fact elsewhere.** When one command or rule turns out wrong, look for the same command,
+11. **The same fact elsewhere.** When one command or rule turns out wrong, look for the same command,
    flag or assumption at every other place in the change.
-11. **Cost and access of following the text.** How many calls, prompts or pages does each step take on
+12. **Cost and access of following the text.** How many calls, prompts or pages does each step take on
    real data? Does every tool, connector and permission it needs appear in the prerequisites?
 
 ## Signals
@@ -123,3 +134,5 @@ into the header's `Not checked:` line.
 | Mixed producers | A count or match that includes another producer's lines, with no field to filter them out. |
 | Rule from one era | A rule that holds for current records and not for older ones, or the reverse. |
 | Unlisted filter value | A filter that misses a spelling or variant the field actually takes. |
+| Procedure picks the wrong thing | Followed literally, an instruction returns an echo, a header, a preview or a stale row instead of the value. |
+| Value means something else | A field the text treats as X is produced as Y (a merge commit, not the head; a queue time, not a run time). |
