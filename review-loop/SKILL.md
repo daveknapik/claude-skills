@@ -24,7 +24,7 @@ In zsh, `$REF:app/x.py` applies the `:a` modifier and reads the wrong path.
 | File | Who reads it |
 | --- | --- |
 | `SKILL_DIR/reviewer-brief.md` | every reviewer, first |
-| `SKILL_DIR/lens-conformance.md`, `lens-correctness.md`, `lens-security.md`, `lens-environment.md`, `lens-coherence.md` | the lens reviewer of that name |
+| `SKILL_DIR/lens-conformance.md`, `lens-correctness.md`, `lens-security.md`, `lens-environment.md`, `lens-coherence.md`, `lens-fix.md` | the lens reviewer of that name |
 | `SKILL_DIR/snapshot.sh` | you only |
 | `SKILL_DIR/profiles/<repo>.md` | you; reviewers read only lens addenda |
 | `SKILL_DIR/profiles/README.md` | you, to parse a profile |
@@ -44,15 +44,19 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 - A reviewer report without a valid header is "not run", never "no findings".
 - Severity labels are for the user's adjudication only. Nothing written into a PR body, ticket or code
   comment carries "blocker", a correction notice, or a list of review decisions.
-- Two rounds at most per run. Nothing is held for a third. Never start reviewers outside a run's two
-  rounds: changes made after a run's summary (fixes the user asks for, replies to other reviewers, new
-  work) are reviewed by invoking the skill again (see Re-review), which picks lenses for those changes.
+- Two rounds at most per run. Nothing is held for a third. Never start reviewers outside a run.
+- **Full runs at milestones; fix mode between them.** A full run reviews the branch before a PR is
+  opened, and again after a round of human review if the fixes changed behaviour or added more than a
+  few lines. A batch of fixes in between (answers to review comments from people or bots, or to findings
+  of an earlier run) is reviewed with `/review-loop fix` (see Fix mode): one reviewer, one pass. New
+  feature work after a milestone gets a full run (see Re-review).
 
 ## Arguments
 
 ```text
 /review-loop [small|normal|deep] [<KEY> ...] [--base <ref>] [--model <m> | --model <key>=<m>,...]
              [--profile <name>] [--plan <path>] [--no-toolkit]
+/review-loop fix [<KEY>] [--since <ref>] [--comments <path>] [--base <ref>] [--model <m>]
 /review-loop retro [<KEY>]
 /review-loop help            (also: --help, "how do I use review-loop")
 ```
@@ -60,7 +64,7 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 - A depth word becomes the first option of the preflight question; the question is still asked.
 - `<KEY>`: ticket keys. The first one names the run directory.
 - `<m>` is one of `sonnet`, `opus`, `fable`, `haiku`, `inherit`. `<key>` is one of `conformance`,
-  `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit`.
+  `correctness`, `security`, `environment`, `coherence`, `fix`, `unguided`, `round2`, `toolkit`.
 - `--model <m>` sets every reviewer in every round, toolkit agents included. `--model <key>=<m>,...` sets
   only the named keys. Precedence: flag > profile `models:` > built-in table.
 - `--profile <name>` uses `SKILL_DIR/profiles/<name>.md` instead of the repo-name lookup. A shared
@@ -69,9 +73,13 @@ Nothing goes in the repository tree and nothing in a session temp directory.
 - `--plan <path>` names the plan file and skips plan resolution.
 - `--no-toolkit` skips every toolkit agent for this run.
 - `--base <ref>` names the branch the work merges into (e.g. `origin/dev`), overriding the profile.
+- `--since <ref>` (fix mode) is the commit the fixes start from, for example the one a reviewer reviewed.
+- `--comments <path>` (fix mode) is a file with the review comments the fixes answer.
 
 **help**: print the block between `<!-- quickref:start -->` and `<!-- quickref:end -->` in
 `SKILL_DIR/README.md` verbatim, then stop. Start no agents, run no git commands.
+
+**fix**: run Fix mode (below) instead of Steps 0–4.
 
 **retro**: jump to Step 5 for the newest run of `<KEY>`; with no key, the newest run under `WORK_ROOT/reviews/`
 whose State has `retro: pending`.
@@ -91,6 +99,7 @@ Unknown flags or values: say which, show the usage block, stop.
 | `coherence` | opus | when relevant (below) |
 | `unguided` | opus | fable at depth small, where it is the only reviewer, unless a flag or profile sets `unguided` |
 | `round2` | opus | the round-2 correctness reviewer |
+| `fix` | opus | the one reviewer in fix mode |
 | `toolkit` | inherit | `inherit` = omit the Agent `model` parameter |
 
 Pass the resolved model as the Agent tool's `model` parameter; it overrides an agent definition's own
@@ -275,6 +284,7 @@ CHANGED_FILES: <RUN>/changed-files.txt
 TICKET_FILE: <RUN>/ticket.md | none
 PLAN_FILE: <RUN>/plan.md | none
 PR_FILE: <RUN>/pr.md | none
+COMMENTS_FILE: <RUN>/comments.md | none (fix mode only)
 PROFILE_FILE: <RUN>/profile.md | none
 LESSONS_FILE: <WORK_ROOT>/review-lessons.md | none
 TESTS: <one line: command, pass/fail counts, failing names, "no tests touched", or "not run: <reason>">
@@ -286,7 +296,7 @@ LEDGER: none
 PRIOR_LEDGER: <path> | none
 KEYS: <all keys>
 MODE: full | delta
-MODELS: conformance=<m> correctness=<m> security=<m> environment=<m> coherence=<m> unguided=<m> round2=<m> toolkit=<m>
+MODELS: conformance=<m> correctness=<m> security=<m> environment=<m> coherence=<m> fix=<m> unguided=<m> round2=<m> toolkit=<m>
 ```
 
 ### `ledger.md`
@@ -295,7 +305,7 @@ MODELS: conformance=<m> correctness=<m> security=<m> environment=<m> coherence=<
 ## State
 run: <RUN>
 step: round-1-pending | round-2-pending | summary | done
-depth: small | normal | deep
+depth: small | normal | deep | fix
 models: <as in context.md>
 merge_base: <sha>
 head: <HEAD at the run's snapshot>
@@ -303,7 +313,7 @@ snap1: <sha>
 snap2: <sha | none>
 snap_final: <sha | none>
 prior_run: <path | none>
-mode: full | delta
+mode: full | delta | fix
 retro: none | pending | done | skipped
 
 ## Findings
@@ -464,7 +474,7 @@ Write `RUN/summary.md` and print it. Follow the user's reporting rules:
   usage per reviewer per round; PR-body sentences pending.
 - Head no-action items `No action — …`.
 - If round-2 adjudication changed any file, those changes have had no review: make the first ask "Run
-  `/review-loop` again to review the <n> changes made after round 2", not a request to accept them
+  `/review-loop fix` to review the <n> changes made after round 2", not a request to accept them
   unreviewed.
 
 Set `step: done` and `retro: pending`, then run Step 5.
@@ -503,9 +513,41 @@ Same key, newest run's `step` not `done`: continue from `step`.
 - If the working tree no longer matches what the ledger implies (a `yes` fix is absent), say so and ask
   before continuing.
 
+## Fix mode
+
+For a batch of fixes between milestones: answers to review comments from people or bots, or to findings
+of an earlier run. One reviewer reads only the fixes and checks each one as new code. No depth, no round
+2, no retro; the run is recorded like any other so the next run can start from it.
+
+1. **Preflight, short.** Steps 0.1 to 0.3 (repo, profile, base branch, fetch, snapshot) and 0.4 (keys)
+   as usual. Then the diff base, first match wins: `--since <ref>` (for example the commit the reviewer
+   reviewed); the newest run for the key with `step: done`, using its `snap_final` if the merge-base is
+   unchanged and `git cat-file -t` still finds it; else ask for it. If the newest run for the key is not
+   `done`, say so and stop: finish or resume that run first. Empty diff: stop with one line.
+2. **The comments being answered.** `--comments <path>` if given. Otherwise, if `gh pr view` finds a PR
+   for the branch, write every review comment, review body and reply created since the diff base's
+   commit time to `comments.md` (`gh api` `pulls/<n>/comments` and `pulls/<n>/reviews`, `--paginate`).
+   Otherwise `none`. A run reviewing the findings of an earlier run points at that run's ledger instead.
+3. **Environment sources** as in Step 0.10, always (the fix reviewer runs commands).
+4. **No question unless something is wrong.** Print the preflight block (repo and branch first, diff
+   base and why, changed files, comments source, sources reachable) and start. Ask only for a warning
+   (unreachable source, unknown diff base, merge-base moved).
+5. **Write the run** as Step 0.12 into `WORK_ROOT/reviews/<KEY>/<YYYY-MM-DD-HHMM>-fix/`, with
+   `COMMENTS_FILE` in `context.md` and `mode: fix`, `depth: fix` in the State block.
+6. **One reviewer** (`fix` model): "Read `<SKILL_DIR>/reviewer-brief.md`, then `<SKILL_DIR>/lens-fix.md`,
+   then `<RUN>/context.md`. Your output file is `<RUN>/round-1/fix.md`; writing it is required, the
+   coordinator parses it." Validate as in Step 1.
+7. **Adjudicate** as in Step 2, every rule included (gate classes, duplicates, siblings, running every
+   command a fix introduces). Apply what passes. There is no round 2: anything still open goes to the
+   summary, and fixes made now are reviewed by the next fix-mode run or milestone.
+8. **Summary** as in Step 4, short: asks first, then each finding with its decision, then usage. Set
+   `snap_final` to the snapshot after adjudication's fixes, write `final.patch`, and set `step: done`,
+   `retro: skipped`.
+
 ## Re-review
 
-Same key, newest run `done` (the branch changed after the pass):
+Same key, newest run `done` (the branch changed after the pass), for a full run at a milestone. A
+fix-mode run counts as a prior run: its `snap_final` is a reviewed snapshot.
 
 1. Read the prior State: `snap_final`, `merge_base`, and `ledger.md`.
 2. Snapshot now; recompute the merge-base. If the new tree equals `snap_final`, stop with one line

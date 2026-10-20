@@ -10,6 +10,7 @@ one fix-review round, and hands back a short summary.
 
 ```text
 /review-loop [small|normal|deep] [KEY ...] [options]   review the current branch
+/review-loop fix [KEY] [--since <ref>]                   review only a batch of fixes (one reviewer)
 /review-loop retro [KEY]                                record which findings were noise (no KEY: newest pending retro)
 /review-loop help                                       print this block
 ```
@@ -19,11 +20,13 @@ one fix-review round, and hands back a short summary.
 | `small` / `normal` / `deep` | recommended in the preflight question | review depth (table below) |
 | `KEY ...` | from the branch name | ticket keys; the first names the run directory |
 | `--model <m>` | built-in table | every reviewer in every round on `<m>` (`sonnet`, `opus`, `fable`, `haiku`, `inherit`) |
-| `--model <key>=<m>,...` | built-in table | only the named reviewers: `conformance`, `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit` |
+| `--model <key>=<m>,...` | built-in table | only the named reviewers: `conformance`, `correctness`, `security`, `environment`, `coherence`, `fix`, `unguided`, `round2`, `toolkit` |
 | `--base <ref>` | profile `base_branch`, else you are asked | branch the work merges into, e.g. `origin/dev` |
 | `--profile <name>` | `profiles/<repo>.md`, else the profile whose `repos:` lists the repo | use another profile |
 | `--plan <path>` | attached when a candidate plan's H1 names a key; otherwise shown as a candidate | the plan file to review against |
 | `--no-toolkit` | toolkit on when relevant | skip all `pr-review-toolkit` agents |
+| `--since <ref>` | the last run's reviewed snapshot | fix mode: the commit the fixes start from |
+| `--comments <path>` | the PR's review comments since then | fix mode: the comments the fixes answer |
 | `--help` | | same as `help` |
 
 | Depth | Recommended when | Round 1 (model) | Toolkit adds (session model by default) | Round 2 (model) |
@@ -47,6 +50,17 @@ profile, default `~/.claude/scratchpad/<repo>`.
 The preflight question shows all of this before anything runs and lets you change it. A bare
 `/review-loop` is the normal invocation.
 <!-- quickref:end -->
+
+## When to run it
+
+| Moment | Run | Cost |
+| --- | --- | --- |
+| Before opening a PR | `/review-loop` (full) | 1 to 10 reviewers, depth by risk |
+| After fixing review comments (people, CodeRabbit, an earlier run) | `/review-loop fix` | 1 reviewer, one pass |
+| After a round of human review, if the fixes changed behaviour or were large | `/review-loop` (full) | as above |
+
+While writing, run every command you write into a file, and check every claim about another system, on
+a current record. That catches most of what a reviewer would, for almost nothing.
 
 ## What happens in a run
 

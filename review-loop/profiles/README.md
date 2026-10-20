@@ -29,7 +29,7 @@ A profile is Markdown with these sections. All are optional; a missing one means
 | `lint_cmd` | Lint command, same placeholders | none |
 | `pr_create_skill` | Skill that creates PRs in this repo, named when the summary hands over PR text | none |
 | `work_root` | Where run files and the lessons file go; `{repo}` expands | `~/.claude/scratchpad/{repo}` |
-| `models` | Map of `conformance`, `correctness`, `security`, `environment`, `coherence`, `unguided`, `round2`, `toolkit` to `sonnet`/`opus`/`fable`/`haiku`/`inherit`. Set only keys you want to change: setting `unguided` also cancels the built-in "fable at depth small" rule | the built-in table in `SKILL.md` |
+| `models` | Map of `conformance`, `correctness`, `security`, `environment`, `coherence`, `fix`, `unguided`, `round2`, `toolkit` to `sonnet`/`opus`/`fable`/`haiku`/`inherit`. Set only keys you want to change: setting `unguided` also cancels the built-in "fable at depth small" rule | the built-in table in `SKILL.md` |
 | `toolkit_extra` | List of extra `pr-review-toolkit` agents to run, by short name, e.g. `[code-reviewer]` | none |
 | `toolkit_skip` | List of toolkit agents never to run here, by short name. Wins over `toolkit_extra` and risk rows | none |
 | `toolkit_notes` | Text pasted into every toolkit agent's prompt: the repo's logging and error-handling rules | none |
