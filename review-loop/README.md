@@ -25,7 +25,7 @@ one fix-review round, and hands back a short summary.
 | `--profile <name>` | `profiles/<repo>.md`, else the profile whose `repos:` lists the repo | use another profile |
 | `--plan <path>` | attached when a candidate plan's H1 names a key; otherwise shown as a candidate | the plan file to review against |
 | `--no-toolkit` | toolkit on when relevant | skip all `pr-review-toolkit` agents |
-| `--since <ref>` | the last run's reviewed snapshot | fix mode: the commit the fixes start from |
+| `--since <ref>` | the last snapshot the previous run's reviewer read | fix mode: the commit the fixes start from |
 | `--comments <path>` | the PR's review comments since then | fix mode: the comments the fixes answer |
 | `--help` | | same as `help` |
 
@@ -98,7 +98,8 @@ that run. Reviewers never see the working tree, never run tests and never call c
 ## Re-review after later changes
 
 Run `/review-loop` again on the same branch after PR feedback or more work. If the merge-base has not
-moved, only the change since the last reviewed snapshot is reviewed (`mode: delta`), and reviewers get
+moved, only the change since the last snapshot a reviewer read is reviewed (`mode: delta`), including
+fixes the previous run applied after its last reviewer, and reviewers get
 the previous ledger so settled findings are not raised again without new evidence. If the merge-base
 moved, the whole branch is reviewed (`mode: full`) and the preflight question says why. An interrupted
 run resumes from where its ledger says it stopped.

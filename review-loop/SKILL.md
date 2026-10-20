@@ -274,7 +274,7 @@ shas.
 
 ```text
 REVIEW_REF: <tree sha>
-BASE_REF: <diff base: merge_base, or snap_final of the prior run in delta mode>
+BASE_REF: <diff base: merge_base, or the prior run's reviewed snapshot in delta mode>
 MERGE_BASE: <merge_base>
 HEAD_REF: <head>
 BASE_BRANCH: <base branch>
@@ -324,6 +324,11 @@ retro: none | pending | done | skipped
 | round | reviewer | model | tokens | tool uses | duration |
 | --- | --- | --- | --- | --- | --- |
 ```
+
+The **reviewed snapshot** of a run is the last tree a reviewer read: `snap2` when it is not `none`,
+else `snap1`. `snap_final` can be newer: it includes the fixes the coordinator applied after the last
+reviewer reported, which nobody has reviewed. A later run starts from the reviewed snapshot, never from
+`snap_final`, so those fixes get their review.
 
 `step` names the next thing to do. `round-1-pending` covers round 1 and its adjudication;
 `round-2-pending` covers round 2 and its adjudication. Write each ledger row as soon as it is decided, so
@@ -521,8 +526,9 @@ of an earlier run. One reviewer reads only the fixes and checks each one as new 
 
 1. **Preflight, short.** Steps 0.1 to 0.3 (repo, profile, base branch, fetch, snapshot) and 0.4 (keys)
    as usual. Then the diff base, first match wins: `--since <ref>` (for example the commit the reviewer
-   reviewed); the newest run for the key with `step: done`, using its `snap_final` if the merge-base is
-   unchanged and `git cat-file -t` still finds it; else ask for it. If the newest run for the key is not
+   reviewed); the newest run for the key with `step: done`, using its reviewed snapshot (see the ledger
+   template) if the merge-base is unchanged and `git cat-file -t` still finds it; else ask for it. Never
+   its `snap_final`: that includes the previous run's own unreviewed fixes. If the newest run for the key is not
    `done`, say so and stop: finish or resume that run first. Empty diff: stop with one line.
 2. **The comments being answered.** `--comments <path>` if given. Otherwise, if `gh pr view` finds a PR
    for the branch, write every review comment, review body and reply created since the diff base's
@@ -550,13 +556,13 @@ of an earlier run. One reviewer reads only the fixes and checks each one as new 
 ## Re-review
 
 Same key, newest run `done` (the branch changed after the pass), for a full run at a milestone. A
-fix-mode run counts as a prior run: its `snap_final` is a reviewed snapshot.
+fix-mode run counts as a prior run.
 
-1. Read the prior State: `snap_final`, `merge_base`, and `ledger.md`.
-2. Snapshot now; recompute the merge-base. If the new tree equals `snap_final`, stop with one line
+1. Read the prior State: its reviewed snapshot (see the ledger template), `merge_base`, and `ledger.md`.
+2. Snapshot now; recompute the merge-base. If the new tree equals the reviewed snapshot, stop with one line
    ("Nothing new since <prior run>; summary at <prior run>/summary.md") and create nothing.
-3. If the merge-base is unchanged and `git cat-file -t <snap_final>` prints `tree`: `mode: delta`, diff
-   base = `snap_final`, `PRIOR_LEDGER` = the prior ledger. Recommend a depth from the delta's size and
+3. If the merge-base is unchanged and `git cat-file -t <reviewed snapshot>` prints `tree`: `mode: delta`,
+   diff base = the reviewed snapshot, `PRIOR_LEDGER` = the prior ledger. Recommend a depth from the delta's size and
    risk paths.
 4. Otherwise `mode: full`, diff base = the new merge-base, `PRIOR_LEDGER` still set, and the preflight
    question gives the reason ("merge-base moved by <n> commits" or "prior snapshot no longer exists").
