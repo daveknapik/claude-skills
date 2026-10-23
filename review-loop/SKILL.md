@@ -420,12 +420,14 @@ Rules:
   chat, a CLI's `--help`), check it now, read-only, and record the result as a ledger row with id
   `NC-<lens>-<nn>`, adjudicated like a finding. Items you cannot check go in the summary.
 - **Gate classes.** Apply immediately (autonomous) when all hold: the finding is confirmed against code,
-  the change stays inside files the branch already changes or the ticket names, no risk path is
-  touched, and the shape is as proposed. Everything else waits for the batched question:
-  rejected `blocking` findings; `premise` findings; fixes on a risk path; changed shapes; fixes outside
-  the ticket's files; PR-body sentences.
-- **Nits** off risk paths: one batch, each fixed or dropped with a one-line ledger row, never in the
-  question. Nits on a risk path are dropped, or join the batched question if worth fixing.
+  the change stays inside files the branch already changes or the ticket names (a new test file for
+  that code counts), and the shape is as proposed or is the union of duplicate reviewers' fixes. A risk
+  path does not gate a fix: list each such fix in the summary as applied on a risk path, and round 2
+  reviews it (security joins, see Step 3). Everything else waits for the batched question: a choice
+  between options (two reasonable fixes, a policy trade-off); rejected `blocking` findings; `premise`
+  findings; shapes you changed for another reason; fixes outside the ticket's files; PR-body sentences.
+- **Nits**, on or off a risk path: one batch, each fixed or dropped with a one-line ledger row, never in
+  the question.
 - **Out of scope**: default for anything in the ticket's area is `fix`. Genuinely separate work →
   `ticket`: draft `RUN/tickets/<slug>.md` with the profile's ticket template, Evidence citing
   `file:line` at `REVIEW_REF` and the run path. The attack pass runs only after the user says yes.
@@ -434,10 +436,15 @@ Rules:
   after yes, `gh pr view --json body` then `gh pr edit --body-file`. No PR yet → hand the sentences to
   the profile's `pr_create_skill` in the summary. Code comments only when a well-written file would
   carry that comment anyway. Never a review-history list in a shared artifact.
-- **The batched question.** Print the full numbered list of gated items first (id, one-line claim,
-  one-line evidence, your recommendation), grouped by the decision each forces. Then one AskUserQuestion
-  with one question per group, at most four; with more than four groups, ask in list order, four per
-  call. Apply the gated fixes the user approves.
+- **The batched question.** Ask only what is the user's to decide; everything else is something you
+  do. Print first, as full sentences: "I applied: …" for the autonomous fixes, then "Decide: …" for
+  each gated item. Every gated item reads "Decide: <action> or <alternative>. I recommend <X> because
+  <Y>." followed by one line of evidence and the finding ids. No fragment or label that could read as a
+  description, an instruction or a recommendation ("Dockerfile: both roots"); no item without a
+  proposal; no "Group A" labels. Lead with the count of decisions, and make it match the list. Then
+  one AskUserQuestion with one question per decision, at most four (more than four: ask in list order,
+  four per call). Each option label is a full imperative action ("Add the Dependabot entry for
+  certifi"), the recommended one first. Apply the gated fixes the user approves.
 - **Second pass.** Re-read every applied change as if all had landed and ask what breaks. Fix that
   before the next snapshot.
 - Rerun the tests on the changed files if any code changed. Record the result.

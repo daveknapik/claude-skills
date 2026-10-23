@@ -76,9 +76,10 @@ a current record. That catches most of what a reviewer would, for almost nothing
    report the same problem, every part of each one's fix is applied, and each fix is repeated wherever
    the same mistake appears elsewhere in the change. Items reviewers list as not checked, and that the
    session can check (other repos, CI runs, cloud reads), are checked then. Confirmed fixes
-   inside the ticket's files and off risk paths are applied straight away. Everything else (rejected
-   blocking findings, premise challenges, risk-path fixes, fixes shaped differently from the reviewer's
-   proposal, PR-body text) comes to you as **one** batched question.
+   inside the ticket's files are applied straight away, on a risk path too (round 2 reviews those).
+   Only real decisions (a choice between options, rejected blocking findings, premise challenges,
+   fixes shaped differently from the reviewer's proposal, fixes outside the ticket's files, PR-body
+   text) come to you as **one** batched question, each written as "Decide: … I recommend …".
 4. **Round 2.** One fresh correctness reviewer reads only the fix diff, attacks every rejection, and
    checks each fix's shape. Security joins when a fix touched a risk path, environment when a fix changed
    a command or a claim about an outside system. There is no round 3; anything still open is yours, and
