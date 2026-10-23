@@ -418,7 +418,9 @@ Rules:
 - **Not checked.** Read every reviewer's `Not checked` list before the batched question. For each item
   that rests on a fact you can check and the reviewers could not (other repos, CI runs, cloud reads,
   chat, a CLI's `--help`), check it now, read-only, and record the result as a ledger row with id
-  `NC-<lens>-<nn>`, adjudicated like a finding. Items you cannot check go in the summary.
+  `NC-<lens>-<nn>`, adjudicated like a finding, including items whose answer you think you already
+  know: a belief you never measured is exactly what this step exists to catch. Items you cannot check
+  go in the summary.
 - **Gate classes.** Apply immediately (autonomous) when all hold: the finding is confirmed against code,
   the change stays inside files the branch already changes or the ticket names (a new test file for
   that code counts), and the shape is as proposed or is the union of duplicate reviewers' fixes. A risk
@@ -434,7 +436,10 @@ Rules:
 - **Clarifications.** The plan file: edit in place as a finished sentence in the section a cold reader
   needs (it is the author's private file; no gate). PR body: propose sentences in the batched question;
   after yes, `gh pr view --json body` then `gh pr edit --body-file`. No PR yet → hand the sentences to
-  the profile's `pr_create_skill` in the summary. Code comments only when a well-written file would
+  the profile's `pr_create_skill` in the summary. A PR body written after the run is text no reviewer
+  read: before the PR is created, list every factual claim in it (versions, behaviour, counts, how an
+  outside system works) and point each at a measurement already in the run or the session; measure the
+  ones with none, and cut what cannot be measured. Code comments only when a well-written file would
   carry that comment anyway. Never a review-history list in a shared artifact.
 - **The batched question.** Ask only what is the user's to decide; everything else is something you
   do. Print first, as full sentences: "I applied: …" for the autonomous fixes, then "Decide: …" for
